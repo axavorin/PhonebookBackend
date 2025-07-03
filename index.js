@@ -1,74 +1,55 @@
+require('dotenv').config()
 const morgan = require('morgan')
 const express = require('express')
+const db = require('./modules/persons')
 const app = express()
 
 app.use(morgan("tiny"))
 app.use(express.static('dist'))
 app.use(express.json())
 
-let persons = [
-    { 
-      "id": "1",
-      "name": "Arto Hellas", 
-      "number": "040-123456"
-    },
-    { 
-      "id": "2",
-      "name": "Ada Lovelace", 
-      "number": "39-44-5323523"
-    },
-    { 
-      "id": "3",
-      "name": "Dan Abramov", 
-      "number": "12-43-234345"
-    },
-    { 
-      "id": "4",
-      "name": "Mary Poppendieck", 
-      "number": "39-23-6423122"
-    }
-]
 
 app.get('/api/persons', (request, response) => {
-    response.json(persons)
+  db.find({}).then(result => response.json(result))
 })
 
-app.get('/api/persons/:id', (request, response) => {
-    const id = request.params.id
-    const person = persons.find(person => person.id === id)
-
-    if (!person) {
-        return response.status(404).end()
-    }
-
-    response.json(person)
+app.get('/api/persons/:id', (request, response, next) => {
+  const id = request.params.id
+  db.findById(id)
+    .then(result => response.json(result))
+    .catch(error => next(error))
 })
 
 app.delete('/api/persons/:id', (request, response) => {
-    const id = request.params.id
-    persons = persons.filter(person => person.id !== id)
-
+  const id = request.params.id
+  db.findByIdAndDelete(id).then(()  => {
     response.status(204).end()
+  })
 })
 
 app.post('/api/persons', (request, response) => {
-    const id = Math.floor(Math.random() * 1000000)
-    
-    const person = {...request.body, id}
-
-    if (!person.name || !person.number || persons.some(i => i.name === person.name)) {
-        return response.status(400).end()
-    }
-    persons = persons.concat(person)
-
+  const person = new db({...request.body})
+  person.save().then(() => {
     response.status(200).end()
+  })
 })
 
 app.get('/info', (request, response) => {
-    response.send(`<h2>Phonebook has info for ${persons.length} people</h2> <h2>${Date()}</h2>`);
+  response.send(`<h2>Phonebook has info for ${db.length} people</h2> <h2>${Date()}</h2>`);
 })
 
-const PORT = 3001
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message)
+
+  if (error.name === 'CastError') {
+    return response.status(400).send({ error: 'malformatted id' })
+  }
+
+  next(error)
+}
+app.use(errorHandler)
+
+const PORT = process.env.PORT
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
 })
