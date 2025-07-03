@@ -30,7 +30,7 @@ app.delete('/api/persons/:id', (request, response) => {
 app.post('/api/persons', (request, response) => {
   const person = new db({...request.body})
   person.save().then(() => {
-    response.status(200).end()
+    response.json(person).end()
   })
 })
 
